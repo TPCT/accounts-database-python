@@ -7,8 +7,8 @@ class Profile(BaseModel):
     model_config = ConfigDict(
         arbitrary_types_allowed=True
     )
-    age_verification_account_status: Optional[str] = None
-    date_created: Optional[datetime] = None
+    username:  Optional[str] = None
     views: Optional[int] = None
     likes: Optional[int] = None
-    username:  Optional[str] = None
+    age_verification_account_status: Optional[str] = None
+    date_created: Optional[datetime] = None
