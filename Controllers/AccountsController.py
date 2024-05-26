@@ -125,6 +125,9 @@ class AccountsController:
             if filters.currency:
                 item_data = [item for item in item_data if item['currency'] == filters.currency]
 
+            if filters.keyword:
+                item_data = [item for item in item_data if filters.keyword in item['name']]
+
             return item_data[(filters.page - 1) * 10: (filters.page * 10)]
         raise HTTPException(status_code=404, detail="Account not found")
 
