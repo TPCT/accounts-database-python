@@ -113,11 +113,11 @@ class AccountsController:
                 for category in items:
                     item_data.extend(items[category])
 
-            if filters.price_sort:
-                item_data = sorted(item_data, key=itemgetter('price'), reverse=filters.price_sort == "desc")
-
             if filters.release_date_sort:
                 item_data = sorted(item_data, key=itemgetter('release_date'), reverse=filters.release_date_sort == "desc")
+
+            if filters.price_sort:
+                item_data = sorted(item_data, key=itemgetter('price'), reverse=filters.price_sort == "desc")
 
             if filters.availability is not None:
                 item_data = [item for item in item_data if item['hidden'] == (not bool(filters.availability))]
