@@ -120,7 +120,7 @@ class AccountsController:
                 item_data = sorted(item_data, key=itemgetter('release_date'), reverse=filters.release_date_sort == "desc")
 
             if filters.availability is not None:
-                item_data = [item for item in item_data if item['hidden'] == filters.availability]
+                item_data = [item for item in item_data if item['hidden'] != filters.availability]
 
             if filters.currency:
                 item_data = [item for item in item_data if item['currency'] == filters.currency]
