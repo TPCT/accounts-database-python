@@ -1,6 +1,7 @@
 from bson import ObjectId
-from fastapi import APIRouter, HTTPException, Depends
-from Core.Mongo import collection
+from fastapi import APIRouter, HTTPException, Depends, FastAPI
+from Core.Mongo import *
+from Core.Config import limiter
 from Models.Account import *
 from Models.Profile import *
 from Models.ItemStats import *
@@ -15,6 +16,7 @@ from operator import itemgetter
 class AccountsController:
     Router: APIRouter = APIRouter(prefix="/accounts")
 
+
     @staticmethod
     @Router.get(
         "",
@@ -24,7 +26,7 @@ class AccountsController:
         response_model_by_alias=False
     )
     async def index():
-        return await collection.find({}, {
+        return await accounts_collection.find({}, {
             '_id': 1,
             'account_profile_image': 1,
             'title': 1,
@@ -39,8 +41,8 @@ class AccountsController:
         response_model=Profile,
         response_model_by_alias=False
     )
-    async def profile(id: str):
-        if (account := await collection.find_one({"_id": ObjectId(id)})) is not None:
+    async def profile( id: str):
+        if (account := await accounts_collection.find_one({"_id": ObjectId(id)})) is not None:
             account = account['profile']['result']
             account['username'] = account['username'][:-len(account['username'])//2] + "*" * (len(account['username']) // 2)
             account['views'] = account['hits']
@@ -54,8 +56,8 @@ class AccountsController:
         response_model=ItemStats,
         response_model_by_alias=False
     )
-    async def item_stats(id: str):
-        if (account := await collection.find_one({"_id": ObjectId(id)})) is not None:
+    async def item_stats( id: str):
+        if (account := await accounts_collection.find_one({"_id": ObjectId(id)})) is not None:
             item_stats = account['item_stats']['result']
             output = {}
             for item_stat in item_stats:
@@ -70,9 +72,14 @@ class AccountsController:
         response_model=AccountWorth,
         response_model_by_alias=False
     )
-    async def item_stats(id: str):
-        if (account := await collection.find_one({"_id": ObjectId(id)})) is not None:
-            return account['account_worth']
+    async def item_stats( id: str):
+        if (account := await accounts_collection.find_one({"_id": ObjectId(id)})) is not None:
+            return account.get('account_worth', {
+                'crowns': "Not Loaded Yet",
+                'coins': "Not Loaded Yet",
+                'gems': "Not Loaded Yet",
+                "free": "Not Loaded Yet"
+            })
         raise HTTPException(status_code=404, detail="Account not found")
 
     @staticmethod
@@ -82,8 +89,8 @@ class AccountsController:
         response_model=List[Xp],
         response_model_by_alias=False
     )
-    async def xp(id: str):
-        if (account := await collection.find_one({"_id": ObjectId(id)})) is not None:
+    async def xp( id: str):
+        if (account := await accounts_collection.find_one({"_id": ObjectId(id)})) is not None:
             xps = account['xp']['result']['lkwd']
             output = []
             for xp in xps:
@@ -101,55 +108,53 @@ class AccountsController:
         response_model_by_alias=False
     )
     async def items(id: str, filters: Filter = Depends(Filter)):
-        if (account := await collection.find_one({"_id": ObjectId(id)}, {'item_details': 1})) is not None:
-            items = account['item_details']
-            item_data = []
+        if (account := await accounts_collection.find_one({"_id": ObjectId(id)})) is not None:
+            account_filters = {
+                'user_id': account['user_id']
+            }
 
             if filters.category:
-                item_data = items.get(filters.category, [])
+                account_filters['category'] = filters.category
                 if filters.sub_category:
-                    item_data = [item for item in item_data if item['sub_category'] == filters.sub_category]
-            else:
-                for category in items:
-                    item_data.extend(items[category])
+                    account_filters['sub_category'] = filters.sub_category
 
-            if filters.release_date_sort:
-                item_data = sorted(item_data, key=itemgetter('release_date'), reverse=filters.release_date_sort == "desc")
-
-            if filters.price_sort:
-                item_data = sorted(item_data, key=itemgetter('price'), reverse=filters.price_sort == "desc")
-
-            if filters.availability is not None:
-                item_data = [item for item in item_data if item['hidden'] == (not bool(filters.availability))]
+            if filters.availability:
+                account_filters['hidden'] = not filters.availability
 
             if filters.currency:
-                item_data = [item for item in item_data if item['currency'] == filters.currency]
+                account_filters['currency'] = filters.currency
 
             if filters.keyword:
-                item_data = [item for item in item_data if filters.keyword.lower() in item['name'].lower()]
+                account_filters['name'] = {"$regex": ".*" + filters.keyword + ".*", "$options": 'i'}
 
-            return item_data[(filters.page - 1) * 10: (filters.page * 10)]
+            items = items_collection.find(account_filters)
+
+            sorting_filter = {}
+
+            if filters.price_sort:
+                sorting_filter['price'] = -1 if filters.price_sort == "desc" else 1
+
+            if filters.release_date_sort:
+                sorting_filter['release_date'] = -1 if filters.release_date_sort == "desc" else 1
+
+            if sorting_filter:
+                return await items.sort(sorting_filter).skip(filters.page * 10).limit(10).to_list(10)
+            return await items.skip(filters.page * 10).limit(10).to_list(10)
+
         raise HTTPException(status_code=404, detail="Account not found")
 
     @staticmethod
     @Router.get(
-        "/{id}/items/categories",
+        "/items/categories",
         response_description="getting account items categories",
         response_model=List[Category],
         response_model_by_alias=False
     )
-    async def categories(id: str):
-        if (account := await collection.find_one({"_id": ObjectId(id)})) is not None:
-            items = account['item_details']
-            categories = []
-            for category in items:
-                category = {
-                    "name": category,
-                    "sub_categories": []
-                }
-                for item in items[category['name']]:
-                    if item['sub_category'] not in category['sub_categories']:
-                        category["sub_categories"].append(item['sub_category'])
-                categories.append(category)
-            return categories
-        raise HTTPException(status_code=404, detail="Account not found")
+    async def categories():
+        categories = await categories_collection.find({}).to_list(10000)
+        output = []
+        for category in categories:
+            del category['_id']
+            category['sub_categories'] = [sub_category['name'] for sub_category in await sub_categories_collection.find({"category": category['name']}).to_list(10000)]
+            output.append(category)
+        return output

@@ -6,7 +6,10 @@ from pydantic import BeforeValidator
 
 client = AsyncIOMotorClient(MONGO_DB)
 database = client.account_selling
-collection = database.account_selling
+accounts_collection = database.accounts
+categories_collection = database.categories
+sub_categories_collection = database.sub_categories
+items_collection = database.items
 
 
 PyObjectId = Annotated[str, BeforeValidator(str)]
