@@ -1,3 +1,5 @@
+import re
+
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Depends, FastAPI
 from Core.Mongo import *
@@ -11,6 +13,7 @@ from Models.Category import *
 from Models.AccountWorth import *
 from Requests.Filter import *
 from operator import itemgetter
+from bson.regex import Regex
 
 
 class AccountsController:
@@ -112,7 +115,6 @@ class AccountsController:
             account_filters = {
                 'user_id': account['user_id']
             }
-
             if filters.category:
                 account_filters['category'] = filters.category
                 if filters.sub_category:
@@ -125,7 +127,8 @@ class AccountsController:
                 account_filters['currency'] = filters.currency
 
             if filters.keyword:
-                account_filters['name'] = {"$regex": ".*" + filters.keyword + ".*", "$options": 'i'}
+
+                account_filters['name'] = Regex(".*" + filters.keyword + ".*", re.IGNORECASE)
 
             items = items_collection.find(account_filters)
 
@@ -137,9 +140,16 @@ class AccountsController:
             if filters.release_date_sort:
                 sorting_filter['release_date'] = -1 if filters.release_date_sort == "desc" else 1
 
+            if filters.page > 0:
+                items = items.skip(filters.page * 10).limit(10)
+
             if sorting_filter:
-                return await items.sort(sorting_filter).skip(filters.page * 10).limit(10).to_list(10)
-            return await items.skip(filters.page * 10).limit(10).to_list(10)
+                items = items.sort(sorting_filter)
+
+            return await items.to_list(10)
+            # if sorting_filter:
+            #     return await items.sort(sorting_filter).skip(filters.page * 10).limit(10).to_list(10)
+            # return await items.skip(filters.page * 10).limit(10).to_list(10)
 
         raise HTTPException(status_code=404, detail="Account not found")
 

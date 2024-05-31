@@ -1,17 +1,22 @@
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
 import time
 import based58
 import requests
 import uuid
 import jnsq
 import urllib3
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import json
+
+lock = Lock()
 
 # MongoDB configuration
 from pymongo import MongoClient
+
 client = MongoClient("mongodb+srv://topgtopg:2IGyXuU4lWhgPRfI@cluster0.ukm3j.mongodb.net/?retryWrites=true&w=majority")
 db = client['account_selling']
 
@@ -21,7 +26,8 @@ sub_categories_collection_v2 = db['sub_categories']
 items_collection_v2 = db['items']
 
 # Another MongoDB client for the items collection
-items_client = MongoClient("mongodb+srv://EMDBUSER:GdtCXD46tdder4@cluster0.wkv7cqk.mongodb.net/?retryWrites=true&w=majority")
+items_client = MongoClient(
+    "mongodb+srv://EMDBUSER:GdtCXD46tdder4@cluster0.wkv7cqk.mongodb.net/?retryWrites=true&w=majority")
 items_db = items_client['Site']
 items_collection = items_db['items']
 
@@ -55,15 +61,19 @@ def gen_start_chat():
         encoding=serialization.Encoding.X962,
         format=serialization.PublicFormat.UncompressedPoint
     )
-    timestamp = int(time.time()+3).to_bytes(8, byteorder='little', signed=True)
+    timestamp = int(time.time() + 3).to_bytes(8, byteorder='little', signed=True)
     public_key_bytes += timestamp
     token = based58.b58encode(public_key_bytes, based58.Alphabet(
         b"MfoqFNBUnJ4l7DWedPvLs-YtVz8wK15rZc90Rm3EbiCSjhaApkxOHIy2XQ"))
     return str(token.decode())
+
+
 # token1 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.JDi405GJpVRouiqfD8EdqeZ05vEodILsQPXZJubytxa2a5kspbhx1l0OjFpRRolqGMrQHC-zUh5Mtsil2sf34ASIzwmnnPWBYlhymXvE3eNSzSyiduWqBpr1TCnG7hWNZSqI2HYFn1JAhl_Ifb8FSFKhz3mCXJVICmKH2zVlUa5gQlY0qBaR5fOTUkbmctwf1hNilzd1MQfTgYYf5RCJZV6qIjqGF_gYucHcpQpRN4rTRs2YjUo1fkII1UHZKZjLpBYkL9lCUltW-rD5RtYFDZAtZgK6MCd5p-9hLQNmZbNgET30zJQXtOl0z4uopDMbLE8XCfrI5ahbU5mcO0Yt5g.Z3MwaMhS3ZTVbon-wjS8XQ.15ElEjrIuMhgvmasq-6OIR6ty-TQMm3IUJhXr_BPIJnXZIxD7H3qyZ3LeiCCVrBR1CfGbRtqnW6A9TqjCQuWd4tOHZ3SLzdOkFTbKQj34wYWuApZfUDECCuzaKuHvbMZoijCm80iYLO73w4GobH1kUdDtMB19QVDiS4ussPwMbY.19jcsrBIBSKVAKkfDH-s4rCBoQ4g-zz9Q4MZjlIG6jY"
 # token1 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.uduv6U1qQi-bnGAp2InWJlDlDb9PoNgV9ynmgEHTZdb0h5mlul0FmMspdlskZROqMiGJLIAP-0beVh5GVpZDHYXbXrNOD-oM8tSakDEfU0ACdDBv2D8RhI7L-NRDxb4g1xSOgTM-qaU920-Wf93N46ACEZRr9mNdh_a7Lta3B3oAZ6PX6h_htgIBNF1QiGITiOBClF2oj-1l5khSzYimYV7JlhOsP0vwqb-Dg-L42RvuFnRdezc5-QfBB14kPfPgVRppIttm5os2ITVP72AadFu5i5TumCo8KGDS5_7emGqvgEJyzD6LJiGptM9TW6hEcqQour2Zgw6Zj0STtHyv3g.Ek4nTTBNxMcGKMLaLbSdSQ.wrz6GibecuPv7c1I4SL2wI6hxZTChNjXJ8U2Gr6MLnrAEYA-_K-DDlQQW-YF8grCj4KXJtn_z5JQVQhuzBeDAZjtxPrbdogU8ehTuEDII_tTlY5AsFJR3-M5QyrAHoDzUHt3ePT6Vraf1peXbCS9giK9aBfPkjcA9pb2mKMiEMU.2X6RK0I1wmnI7-tNSbqcc46Q3vt7ym8qEUY5oEG2NHc"
-token1 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.ZmhnMfaj8R6lPk3kpIXz7Lo1XCW_d907GJY6tA2uZfo_Nv8BSN8gmn_UbiEddASm00j2W-kULVR59bdp0EX60vWxFMiFrOpxKphWYWvwf4zVP4Tk4yDYExsxgpOQju2ek0FyeQBdE_5s-_gTPVHThLtZ6veLNI7yV5OrZfK1NMdybx5DY8TdXHstAuIPrvR2yO9Zl3TehdEDchZkyX-oseVtCWg0jz50D7zMPxzNiWpQ8g1QQLN3vz4CeoXZ-1MTRMP5ZmaaP_LS0eirufdzKEuy4oDJsYMGMdGGX8b_ApIrv_Vio4yvG1xX3MLgqKX6Ql-1rmv7PXQ1KwCdIrrlAw.lk5Bv7XK-Iq8IErMXQHx6w.Wk4VAd0RXHcA_JFnW7b1YWENQinPFWDM8fScSUfzCyrQymLdAv-6MwJLZNR-JixpMWKjpbqiv97lshd1uvHNRyVRV9j9ChJHHy1gAvSu8AfeQ6DAVy2r9qvV1W8i5-VQPna3bLr_j8OvbBe4elECQNH_dInRETAd_445trBw_94.zqqJjjdiMhljx6bczMykOWG-iee02hrksxWmsa_hBvk"
-# token1 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.SSye9hNNQWQj1zjH-13rA7_9npGxIMz8Gu4MvKGZANZ8ATIJnsNFhJbNfus8T3nuPtHnOqOiMrsA9wNht4z4shcmK16EnRHtyQhJ2pwhQOV9Rpo6IzMAfWCUrk-K58motWdedriJet7Gnh1bXM_gqYpX2jDyxfMAHOARa_baa87ivdMWh1UTPsXVW-aJYWAgm3seAluMqyuKxqLlkSG78S2ly_yAL3n6Kc31Epa9h8zvQRw6W-Kr24j-0omwcOMufWTir9cQpzM8sfQJ9TEy-JCDTvDanuVbIB6t0IDQqJFxacWmLVkS7xLjm-0GF_qYHBsEef5RVMFK4xQgxLjKDQ.LW7AQQ_Uo8IDiUHs7ofEvg.hkfquidd4kmcAH3GRFT_3_6ivwWBhVOaU_KIHy5E0qDYsdmC06ZCGZbiNgnBrgkaqtfWhFjpoTavt1yhzZhSavHpizKNgsxpH1NFzpIZVVItmmuMHO8MW6k4fR0DRFRT9IX2OystihGq0uILU2BgbqmawgnwwMIxyvwycp8S3wg.lHP4WoTL3YTaLksgMFxFhKevjmxV-tGr-x03Q2YKSMQ"
+# token1 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.ZmhnMfaj8R6lPk3kpIXz7Lo1XCW_d907GJY6tA2uZfo_Nv8BSN8gmn_UbiEddASm00j2W-kULVR59bdp0EX60vWxFMiFrOpxKphWYWvwf4zVP4Tk4yDYExsxgpOQju2ek0FyeQBdE_5s-_gTPVHThLtZ6veLNI7yV5OrZfK1NMdybx5DY8TdXHstAuIPrvR2yO9Zl3TehdEDchZkyX-oseVtCWg0jz50D7zMPxzNiWpQ8g1QQLN3vz4CeoXZ-1MTRMP5ZmaaP_LS0eirufdzKEuy4oDJsYMGMdGGX8b_ApIrv_Vio4yvG1xX3MLgqKX6Ql-1rmv7PXQ1KwCdIrrlAw.lk5Bv7XK-Iq8IErMXQHx6w.Wk4VAd0RXHcA_JFnW7b1YWENQinPFWDM8fScSUfzCyrQymLdAv-6MwJLZNR-JixpMWKjpbqiv97lshd1uvHNRyVRV9j9ChJHHy1gAvSu8AfeQ6DAVy2r9qvV1W8i5-VQPna3bLr_j8OvbBe4elECQNH_dInRETAd_445trBw_94.zqqJjjdiMhljx6bczMykOWG-iee02hrksxWmsa_hBvk"
+
+
+token1 = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.SSye9hNNQWQj1zjH-13rA7_9npGxIMz8Gu4MvKGZANZ8ATIJnsNFhJbNfus8T3nuPtHnOqOiMrsA9wNht4z4shcmK16EnRHtyQhJ2pwhQOV9Rpo6IzMAfWCUrk-K58motWdedriJet7Gnh1bXM_gqYpX2jDyxfMAHOARa_baa87ivdMWh1UTPsXVW-aJYWAgm3seAluMqyuKxqLlkSG78S2ly_yAL3n6Kc31Epa9h8zvQRw6W-Kr24j-0omwcOMufWTir9cQpzM8sfQJ9TEy-JCDTvDanuVbIB6t0IDQqJFxacWmLVkS7xLjm-0GF_qYHBsEef5RVMFK4xQgxLjKDQ.LW7AQQ_Uo8IDiUHs7ofEvg.hkfquidd4kmcAH3GRFT_3_6ivwWBhVOaU_KIHy5E0qDYsdmC06ZCGZbiNgnBrgkaqtfWhFjpoTavt1yhzZhSavHpizKNgsxpH1NFzpIZVVItmmuMHO8MW6k4fR0DRFRT9IX2OystihGq0uILU2BgbqmawgnwwMIxyvwycp8S3wg.lHP4WoTL3YTaLksgMFxFhKevjmxV-tGr-x03Q2YKSMQ"
 # token1 ="eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIn0.PgAD18JLum-EnsW_i1BbQNAN9VrFA_oPQYgevI1vl_yzdTu5Naac_leF8mKzd-AZVgJ7uU5x_JKcx-V88KurWCThaKr5qGszjkoYemjJTGyYaAUVkKh8_T0mse7CBNLVORgv4NfP-YkKyd_Q9qJWMjMJc44xKLckYOWT9jc26ZIggNyPYYpy24HO869NpOVszNmIpLyR-aZGp4HeDOhzl3Q5su84RbhbU1l3T9OFssis1D7V4yfCNqkgvU8imp-Yxn8RFbxy2Tx_e8ApkO44GJLjNDsnVb2I6NFfjdrMu2hC-gMoId0Zvw2ERdHikV1D1lyrn776lLlbI2-OooKyhA.vhs7AXIHUkf27Ji0I1VVow.H2lQDgtE6ifTKNdPsqt1KP7QLJ2X5b1UK2CxPyVdjb1FuS5-8Ofe6HWqTpaJqok6RjzL6znKLFl0YQrzoNLIQjRODLX9knmsEItj5J6VIpZx0KEf21joaLIu9K1W14NlrEHCtAXmhZqSK_TklSFBS9hoWqPL6UVACBOTCTPWym0.fDJd5LSmuEd1BAQzByaZY04Lw9S8QFNePUb-Oej-S8I"
 
 
@@ -204,7 +214,7 @@ def items(jtag, login_response, profile_info):
         upsert=True
     )
 
-    for item in item_details:
+    def insert_item(item):
         category = item.get('category', 'Uncategorized')
         categories_collection_v2.update_one({
             'name': category
@@ -226,9 +236,14 @@ def items(jtag, login_response, profile_info):
 
         currency = item.get('currency', 'Free')  # Default to 'Free' if currency is not specified
         price = item.get('price', 0)
-        if currency in account_worth:
-            account_worth[currency] += price
-            currency_counts[currency] += 1
+        with lock:
+            if currency in account_worth:
+                account_worth[currency] += price
+                currency_counts[currency] += 1
+
+    with ThreadPoolExecutor() as e:
+        for item in item_details:
+            e.submit(insert_item, item)
 
     # Create the account worth structure
     account_worth_summary = {
@@ -238,11 +253,8 @@ def items(jtag, login_response, profile_info):
         'free': f"{account_worth['Free']} out of {currency_counts['Free']} free items"
     }
 
-
-
     # Update the user document in MongoDB with the categorized item details, account worth, Title, and profile image
     # Generate the Title and account_profile_image
-
 
     accounts_collection_v2.update_one(
         {"user_id": user_id},
@@ -270,4 +282,3 @@ def main():
 
 
 main()
-

@@ -22,8 +22,8 @@ if __name__ == '__main__':
         'api:app',
         host='127.0.0.1',
         port=8080,
-        workers=5,
-        limit_max_requests=500,
-        limit_concurrency=500,
+        # workers=5,
+        # limit_max_requests=500,
+        # limit_concurrency=500,
         reload=True
     )

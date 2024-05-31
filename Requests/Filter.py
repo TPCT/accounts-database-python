@@ -32,4 +32,4 @@ class Filter(BaseModel):
             raise RequestValidationError("Currency must be either 'Crowns', 'Gems', 'Coins', 'Free'")
         return v
 
-    page: Optional[int] = Field(1, ge=1)
+    page: Optional[int] = Field(0, ge=0)
