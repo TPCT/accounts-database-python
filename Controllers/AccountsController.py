@@ -115,29 +115,28 @@ class AccountsController:
             account_filters = {
                 'user_id': account['user_id']
             }
-            if filters.category:
+            if filters.category is not None:
                 account_filters['category'] = filters.category
                 if filters.sub_category:
                     account_filters['sub_category'] = filters.sub_category
 
-            if filters.availability:
+            if filters.availability is not None:
                 account_filters['hidden'] = not filters.availability
 
-            if filters.currency:
+            if filters.currency is not None:
                 account_filters['currency'] = filters.currency
 
-            if filters.keyword:
-
+            if filters.keyword is not None:
                 account_filters['name'] = Regex(".*" + filters.keyword + ".*", re.IGNORECASE)
 
             items = items_collection.find(account_filters)
 
             sorting_filter = {}
 
-            if filters.price_sort:
+            if filters.price_sort is not None:
                 sorting_filter['price'] = -1 if filters.price_sort == "desc" else 1
 
-            if filters.release_date_sort:
+            if filters.release_date_sort is not None:
                 sorting_filter['release_date'] = -1 if filters.release_date_sort == "desc" else 1
 
             if filters.page > 0:
