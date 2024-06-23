@@ -1,3 +1,4 @@
+import math
 import re
 
 from bson import ObjectId
@@ -9,6 +10,7 @@ from Models.Profile import *
 from Models.ItemStats import *
 from Models.Xp import *
 from Models.Item import *
+from Models.Items import *
 from Models.Category import *
 from Models.AccountWorth import *
 from Requests.Filter import *
@@ -44,7 +46,7 @@ class AccountsController:
         response_model=Profile,
         response_model_by_alias=False
     )
-    async def profile( id: str):
+    async def profile(id: str):
         if (account := await accounts_collection.find_one({"_id": ObjectId(id)})) is not None:
             account = account['profile']['result']
             account['username'] = account['username'][:-len(account['username'])//2] + "*" * (len(account['username']) // 2)
@@ -107,7 +109,7 @@ class AccountsController:
     @Router.get(
         "/{id}/items",
         response_description="getting account items data",
-        response_model=List[Item],
+        response_model=Items,
         response_model_by_alias=False
     )
     async def items(id: str, filters: Filter = Depends(Filter)):
@@ -130,6 +132,7 @@ class AccountsController:
                 account_filters['name'] = Regex(".*" + filters.keyword + ".*", re.IGNORECASE)
 
             items = items_collection.find(account_filters)
+            pages = math.ceil(await items_collection.count_documents(account_filters) / 10) - 1
 
             sorting_filter = {}
 
@@ -139,17 +142,13 @@ class AccountsController:
             if filters.release_date_sort is not None:
                 sorting_filter['release_date'] = -1 if filters.release_date_sort == "desc" else 1
 
-            if filters.page > 0:
+            if filters.page > 1:
                 items = items.skip(filters.page * 10).limit(10)
 
             if sorting_filter:
                 items = items.sort(sorting_filter)
 
-            return await items.to_list(10)
-            # if sorting_filter:
-            #     return await items.sort(sorting_filter).skip(filters.page * 10).limit(10).to_list(10)
-            # return await items.skip(filters.page * 10).limit(10).to_list(10)
-
+            return Items(items=await items.to_list(10), pages=pages)
         raise HTTPException(status_code=404, detail="Account not found")
 
     @staticmethod
